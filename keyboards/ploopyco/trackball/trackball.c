@@ -53,6 +53,7 @@
 
 #define PLOOPY_DRAGSCROLL_DENOMINATOR_Y 100
 #define PLOOPY_DRAGSCROLL_DENOMINATOR_X 200
+#define PLOOPY_DRAGSCROLL_RUBBERBAND_MULT 5
 
 static int _dragscroll_accumulator_x = 0;
 static int _dragscroll_accumulator_y = 0;
@@ -133,29 +134,38 @@ report_mouse_t pointing_device_task_kb(report_mouse_t mouse_report) {
     process_wheel();
 
     if (is_drag_scroll) {
-#ifdef PLOOPY_DRAGSCROLL_H_INVERT
-        // Invert horizontal scroll direction
-        _dragscroll_accumulator_x -= mouse_report.x;
-#else
+        // if one direction is much more than the other then remove it
+        if (mouse_report.x > mouse_report.y*PLOOPY_DRAGSCROLL_RUBBERBAND_MULT) {
+            mouse_report.y = 0;
+        }
+        if (mouse_report.y > mouse_report.x*PLOOPY_DRAGSCROLL_RUBBERBAND_MULT) {
+            mouse_report.x = 0;
+        }
+
+        // add movement to accumulators
         _dragscroll_accumulator_x += mouse_report.x;
-#endif
-#ifdef PLOOPY_DRAGSCROLL_INVERT
-        // Invert vertical scroll direction
         _dragscroll_accumulator_y -= mouse_report.y;
-#else
-        _dragscroll_accumulator_y += mouse_report.y;
-#endif
+
+        // divide total movement by denominators to control speed
+        // this also makes the mouse not move until exceeding the denominator
         int div_x = _dragscroll_accumulator_x / PLOOPY_DRAGSCROLL_DENOMINATOR_X;
         int div_y = _dragscroll_accumulator_y / PLOOPY_DRAGSCROLL_DENOMINATOR_Y;
+
         if (div_x != 0) {
+            // increase horizontal scroll by divided accumulator
             mouse_report.h += div_x;
+            // reduce acccumulator by total movement to reset
             _dragscroll_accumulator_x -= div_x * PLOOPY_DRAGSCROLL_DENOMINATOR_X;
         }
+
         if (div_y != 0) {
+            // increase vertical scroll by divided accumulator
             mouse_report.v += div_y;
+            // reduce accumulator by total amount to reset
             _dragscroll_accumulator_y -= div_y * PLOOPY_DRAGSCROLL_DENOMINATOR_Y;
         }
 
+        // remove mouse movement
         mouse_report.x = 0;
         mouse_report.y = 0;
     }
